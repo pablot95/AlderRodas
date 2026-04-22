@@ -154,11 +154,15 @@
                 const q = query(
                     collection(db, 'articulos'),
                     where('slug', '==', slug),
-                    where('publicado', '==', true),
                     limit(1)
                 );
                 const snap = await getDocs(q);
                 if (snap.empty) {
+                    showError();
+                    return;
+                }
+                // Verificar publicado en el cliente (evita índice compuesto)
+                if (!snap.docs[0].data().publicado) {
                     showError();
                     return;
                 }
