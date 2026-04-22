@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin – Alder Rodas Blog</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+    <!-- ── LOGIN ─────────────────────────────────────────── -->
+    <div id="view-login" class="login-wrap">
+        <div class="login-box">
+            <div class="login-logo">
+                <div class="login-psi">Ψ</div>
+                <h1>Admin Panel</h1>
+                <p>Lic. Alder Rodas – Blog</p>
+            </div>
+            <form id="login-form" novalidate>
+                <div class="field-group">
+                    <label for="login-email">Correo electrónico</label>
+                    <div class="field-icon-wrap">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="login-email" placeholder="usuario@email.com" required autocomplete="email">
+                    </div>
+                </div>
+                <div class="field-group">
+                    <label for="login-pass">Contraseña</label>
+                    <div class="field-icon-wrap">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="login-pass" placeholder="••••••••" required autocomplete="current-password">
+                        <button type="button" class="toggle-pass" id="toggle-pass" aria-label="Mostrar contraseña">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="login-error" id="login-error"></div>
+                <button type="submit" class="btn-primary btn-full" id="login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Ingresar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── DASHBOARD ─────────────────────────────────────── -->
+    <div id="view-admin" style="display:none;">
+
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="sidebar-psi">Ψ</div>
+                <div>
+                    <strong>Admin Panel</strong>
+                    <span id="admin-email-display"></span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="snav-item active" data-view="list" id="btn-list">
+                    <i class="fas fa-list"></i> Artículos
+                </button>
+                <button class="snav-item" data-view="new" id="btn-new">
+                    <i class="fas fa-plus"></i> Nuevo artículo
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/blog" target="_blank" class="snav-item">
+                    <i class="fas fa-external-link-alt"></i> Ver blog
+                </a>
+                <button class="snav-item snav-logout" id="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="admin-main">
+
+            <!-- ─ Lista de artículos ─ -->
+            <section id="panel-list" class="admin-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-list"></i> Artículos</h2>
+                    <button class="btn-primary" id="btn-new-inline">
+                        <i class="fas fa-plus"></i> Nuevo artículo
+                    </button>
+                </div>
+                <div class="articles-toolbar">
+                    <input type="search" id="search-input" placeholder="Buscar por título…" class="search-field">
+                    <select id="filter-status" class="select-field">
+                        <option value="">Todos</option>
+                        <option value="publicado">Publicados</option>
+                        <option value="borrador">Borradores</option>
+                    </select>
+                </div>
+                <div id="articles-table-wrap">
+                    <div class="admin-spinner" id="list-spinner"></div>
+                    <table class="articles-table" id="articles-table" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>Título</th>
+                                <th>Slug / URL</th>
+                                <th>Categoría</th>
+                                <th>Estado</th>
+                                <th>Fecha</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="articles-tbody"></tbody>
+                    </table>
+                    <p class="empty-list" id="empty-list" style="display:none;">No hay artículos todavía. ¡Creá el primero!</p>
+                </div>
+            </section>
+
+            <!-- ─ Formulario crear / editar ─ -->
+            <section id="panel-form" class="admin-panel" style="display:none;">
+                <div class="panel-header">
+                    <h2 id="form-title"><i class="fas fa-pen"></i> Nuevo artículo</h2>
+                    <button class="btn-ghost-sm" id="btn-back-list">
+                        <i class="fas fa-arrow-left"></i> Volver a lista
+                    </button>
+                </div>
+
+                <form id="article-form" novalidate>
+                    <input type="hidden" id="art-id">
+
+                    <!-- Grupo: Contenido principal -->
+                    <div class="form-section">
+                        <h3 class="form-section-title"><i class="fas fa-file-alt"></i> Contenido</h3>
+                        <div class="form-row">
+                            <div class="field-group">
+                                <label for="art-titulo">Título visible <span class="required">*</span></label>
+                                <input type="text" id="art-titulo" placeholder="Título del artículo" required>
+                            </div>
+                        </div>
+                        <div class="form-row two-cols">
+                            <div class="field-group">
+                                <label for="art-slug">
+                                    Slug / URL amigable <span class="required">*</span>
+                                    <span class="field-hint">Ej: ansiedad-constante</span>
+                                </label>
+                                <div class="slug-preview-wrap">
+                                    <span class="slug-base">/blog/</span>
+                                    <input type="text" id="art-slug" placeholder="mi-articulo" required pattern="[a-z0-9\-]+">
+                                </div>
+                            </div>
+                            <div class="field-group">
+                                <label for="art-categoria">Categoría</label>
+                                <input type="text" id="art-categoria" placeholder="Ej: Ansiedad, Depresión…" list="cat-list">
+                                <datalist id="cat-list">
+                                    <option value="Ansiedad">
+                                    <option value="Depresión">
+                                    <option value="Trauma">
+                                    <option value="Pareja y Familia">
+                                    <option value="Bienestar">
+                                    <option value="Salud Mental">
+                                </datalist>
+                            </div>
+                        </div>
+                        <div class="field-group">
+                            <label for="art-extracto">
+                                Extracto / Resumen
+                                <span class="field-hint">Resumen corto que aparece en las tarjetas (max. 200 caracteres)</span>
+                            </label>
+                            <textarea id="art-extracto" rows="3" maxlength="200" placeholder="Breve descripción del artículo…"></textarea>
+                            <span class="char-counter"><span id="extracto-count">0</span>/200</span>
+                        </div>
+                        <div class="field-group">
+                            <label>
+                                Contenido del artículo <span class="required">*</span>
+                                <span class="field-hint">Podés usar HTML (h2, h3, p, ul, ol, strong, em, blockquote, a)</span>
+                            </label>
+                            <div class="editor-toolbar">
+                                <button type="button" class="tb-btn" data-cmd="bold" title="Negrita"><i class="fas fa-bold"></i></button>
+                                <button type="button" class="tb-btn" data-cmd="italic" title="Cursiva"><i class="fas fa-italic"></i></button>
+                                <button type="button" class="tb-btn" data-cmd="h2" title="Título H2">H2</button>
+                                <button type="button" class="tb-btn" data-cmd="h3" title="Título H3">H3</button>
+                                <button type="button" class="tb-btn" data-cmd="ul" title="Lista"><i class="fas fa-list-ul"></i></button>
+                                <button type="button" class="tb-btn" data-cmd="blockquote" title="Cita"><i class="fas fa-quote-left"></i></button>
+                                <button type="button" class="tb-btn" data-cmd="link" title="Enlace"><i class="fas fa-link"></i></button>
+                                <div class="tb-sep"></div>
+                                <button type="button" class="tb-btn tb-toggle" id="toggle-preview" title="Preview">
+                                    <i class="fas fa-eye"></i> Preview
+                                </button>
+                            </div>
+                            <div class="editor-wrap">
+                                <textarea id="art-texto" rows="18" placeholder="Escribí el contenido del artículo aquí. Podés usar etiquetas HTML para dar formato." required></textarea>
+                                <div id="art-preview" class="art-preview article-page-content" style="display:none;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Imagen -->
+                    <div class="form-section">
+                        <h3 class="form-section-title"><i class="fas fa-image"></i> Imagen destacada</h3>
+                        <div class="form-row two-cols">
+                            <div class="field-group">
+                                <label>Subir imagen</label>
+                                <div class="upload-zone" id="upload-zone">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>Arrastrá una imagen o hacé click</p>
+                                    <span class="upload-hint">JPG, PNG, WebP – máx. 4 MB</span>
+                                    <input type="file" id="img-upload" accept="image/*" hidden>
+                                </div>
+                                <div class="upload-progress" id="upload-progress" style="display:none;">
+                                    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                                    <span id="progress-text">Subiendo…</span>
+                                </div>
+                            </div>
+                            <div class="field-group">
+                                <label for="art-imagen-url">URL de la imagen</label>
+                                <input type="url" id="art-imagen-url" placeholder="https://…">
+                                <div class="img-thumb-wrap" id="img-thumb-wrap" style="display:none;">
+                                    <img id="img-thumb" src="" alt="Preview imagen">
+                                </div>
+                                <div class="field-group" style="margin-top:.75rem;">
+                                    <label for="art-imagen-alt">Texto alternativo (alt)</label>
+                                    <input type="text" id="art-imagen-alt" placeholder="Descripción de la imagen">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: SEO -->
+                    <div class="form-section">
+                        <h3 class="form-section-title"><i class="fas fa-search"></i> SEO</h3>
+                        <div class="field-group">
+                            <label for="art-titulo-seo">
+                                Título SEO
+                                <span class="field-hint">Aparece en Google y pestañas del navegador. Si está vacío, se usa el título visible.</span>
+                            </label>
+                            <input type="text" id="art-titulo-seo" placeholder="Título para buscadores (max. 60 caracteres)">
+                            <div class="seo-counter">
+                                <span id="seo-title-count">0</span>/60 caracteres
+                                <span class="seo-status" id="seo-title-status"></span>
+                            </div>
+                        </div>
+                        <div class="field-group">
+                            <label for="art-meta-desc">
+                                Meta descripción
+                                <span class="field-hint">Descripción que aparece en los resultados de búsqueda (max. 160 caracteres).</span>
+                            </label>
+                            <textarea id="art-meta-desc" rows="3" maxlength="160" placeholder="Descripción para buscadores…"></textarea>
+                            <div class="seo-counter">
+                                <span id="seo-desc-count">0</span>/160 caracteres
+                                <span class="seo-status" id="seo-desc-status"></span>
+                            </div>
+                        </div>
+                        <!-- Preview Google SERP -->
+                        <div class="serp-preview">
+                            <p class="serp-label">Preview en Google</p>
+                            <div class="serp-box">
+                                <div class="serp-url">alderrodas.com.ar/blog/<span id="serp-slug">slug</span></div>
+                                <div class="serp-title" id="serp-title">Título del artículo</div>
+                                <div class="serp-desc"  id="serp-desc">Meta descripción del artículo.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grupo: Publicación -->
+                    <div class="form-section">
+                        <h3 class="form-section-title"><i class="fas fa-cog"></i> Publicación</h3>
+                        <div class="form-row two-cols">
+                            <div class="field-group">
+                                <label for="art-fecha">Fecha de publicación</label>
+                                <input type="datetime-local" id="art-fecha">
+                            </div>
+                            <div class="field-group checkboxes-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="art-publicado">
+                                    <span class="checkbox-custom"></span>
+                                    Publicar artículo
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="art-destacado">
+                                    <span class="checkbox-custom"></span>
+                                    Marcar como destacado (aparece primero en landing)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Acciones del formulario -->
+                    <div class="form-actions">
+                        <div class="form-save-status" id="save-status"></div>
+                        <div class="form-btns">
+                            <button type="button" class="btn-ghost" id="btn-cancel">Cancelar</button>
+                            <button type="button" class="btn-secondary" id="btn-draft">
+                                <i class="fas fa-save"></i> Guardar borrador
+                            </button>
+                            <button type="submit" class="btn-primary" id="btn-publish">
+                                <i class="fas fa-upload"></i> Publicar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Confirmación delete -->
+    <div class="confirm-overlay" id="confirm-overlay" style="display:none;">
+        <div class="confirm-box">
+            <i class="fas fa-triangle-exclamation confirm-icon"></i>
+            <h3>¿Eliminar artículo?</h3>
+            <p id="confirm-msg">Esta acción no se puede deshacer.</p>
+            <div class="confirm-btns">
+                <button class="btn-ghost" id="confirm-cancel">Cancelar</button>
+                <button class="btn-danger" id="confirm-ok">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="admin.js"></script>
+</body>
+</html>

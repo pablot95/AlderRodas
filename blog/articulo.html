@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- SEO meta tags — se rellenan dinámicamente desde Firestore -->
+    <title id="page-title">Artículo | Lic. Alder Rodas – Psicólogo Clínico</title>
+    <meta name="description" id="page-desc" content="">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" id="page-canonical" href="https://www.alderrodas.com.ar">
+    <!-- OG / Social -->
+    <meta property="og:type"  content="article">
+    <meta property="og:site_name" content="Lic. Alder Rodas – Psicólogo Clínico">
+    <meta property="og:title" id="og-title" content="">
+    <meta property="og:description" id="og-desc" content="">
+    <meta property="og:url"   id="og-url"  content="">
+    <meta property="og:image" id="og-image" content="">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" id="tw-title" content="">
+    <meta name="twitter:description" id="tw-desc" content="">
+    <meta name="twitter:image"  id="tw-image" content="">
+    <!-- Schema.org BlogPosting — se inyecta dinámicamente -->
+    <script id="schema-article" type="application/ld+json"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="blog.css">
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="blog-nav">
+        <a href="/" class="blog-nav-logo">
+            <img src="../images/logo.jpeg" alt="Alder Rodas">
+            <div>
+                <strong>Lic. Alder Rodas</strong>
+                <span>Psicólogo Clínico</span>
+            </div>
+        </a>
+        <a href="/blog" class="blog-nav-back">
+            <i class="fas fa-arrow-left"></i> Volver al blog
+        </a>
+    </nav>
+
+    <!-- ESTADO DE CARGA -->
+    <div id="loading-state" class="blog-spinner" style="margin-top:80px;"></div>
+    <div id="error-state" class="blog-empty" style="display:none;margin-top:80px;">
+        <i class="fas fa-triangle-exclamation" style="font-size:2.5rem;opacity:.3;display:block;margin-bottom:1rem;"></i>
+        Artículo no encontrado. <a href="/blog" style="color:var(--teal);">Volver al blog</a>
+    </div>
+
+    <!-- ARTÍCULO (se rellena dinámicamente) -->
+    <article id="article-wrap" style="display:none;">
+        <div class="article-page">
+            <img id="art-img" class="article-page-img" src="" alt="" style="display:none;">
+            <div class="article-page-cat-row">
+                <span class="blog-tag" id="art-cat" style="display:none;"></span>
+                <span class="article-page-date" id="art-date"></span>
+            </div>
+            <h1 id="art-title"></h1>
+            <p class="article-page-excerpt" id="art-excerpt" style="display:none;"></p>
+            <div class="article-page-content" id="art-content"></div>
+
+            <!-- CTA WhatsApp -->
+            <div class="article-cta-box">
+                <h3>¿Querés hablar con un psicólogo?</h3>
+                <p>Alder Rodas atiende online para Argentina y todos los países de habla hispana.<br>Solicitá tu turno por WhatsApp.</p>
+                <a href="https://wa.me/5491151426367?text=Hola%2C%20me%20gustar%C3%ADa%20consultar%20sobre%20terapia." class="article-cta-btn" target="_blank" rel="noopener">
+                    <i class="fab fa-whatsapp"></i> Solicitar turno por WhatsApp
+                </a>
+            </div>
+        </div>
+
+        <!-- Artículos relacionados -->
+        <section class="article-related" id="related-section" style="display:none;">
+            <h2>Artículos <em>relacionados</em></h2>
+            <div class="blog-grid" id="related-grid"></div>
+        </section>
+    </article>
+
+    <!-- FOOTER -->
+    <footer class="blog-footer">
+        <p>© 2025 Lic. Alder Rodas · Psicólogo Clínico · <a href="/">alderrodas.com.ar</a></p>
+    </footer>
+
+    <!-- MODAL (para artículos relacionados) -->
+    <div class="art-modal-overlay" id="artModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="art-modal-box">
+            <button class="art-modal-close" id="modalClose" aria-label="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="modalImgWrap"></div>
+            <div class="art-modal-body">
+                <div class="art-modal-meta">
+                    <span class="art-modal-cat" id="modalCat"></span>
+                    <span class="art-modal-date" id="modalDate"></span>
+                </div>
+                <h2 id="modalTitle"></h2>
+                <div class="art-modal-content" id="modalContent"></div>
+                <div class="art-modal-footer">
+                    <a href="#" class="art-modal-full-link" id="modalFullLink" target="_blank">
+                        <i class="fas fa-arrow-up-right-from-square"></i> Ver artículo completo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+        import { getFirestore, collection, query, where, orderBy, limit, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCzj5gLvEhZdl3LNoHVqcDMzFKrW_2Dkno",
+            authDomain: "alderrodas.firebaseapp.com",
+            projectId: "alderrodas",
+            storageBucket: "alderrodas.firebasestorage.app",
+            messagingSenderId: "169054089082",
+            appId: "1:169054089082:web:2838367f09cd7349fe70c3"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db  = getFirestore(app);
+
+        // ── Extraer slug de la URL ───────────────────────────
+        // /blog/ansiedad-constante → "ansiedad-constante"
+        const slug = location.pathname.replace(/^\/blog\/?/, '').replace(/\/$/, '');
+
+        function formatDate(ts) {
+            if (!ts) return '';
+            const d = ts.toDate ? ts.toDate() : new Date(ts);
+            return d.toLocaleDateString('es-AR', { day:'numeric', month:'long', year:'numeric' });
+        }
+        function isoDate(ts) {
+            if (!ts) return '';
+            const d = ts.toDate ? ts.toDate() : new Date(ts);
+            return d.toISOString();
+        }
+        function stripHtml(html) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || '';
+        }
+
+        // ── Cargar artículo por slug ─────────────────────────
+        async function loadArticle() {
+            if (!slug) {
+                // Sin slug → redirigir al listing
+                location.href = '/blog';
+                return;
+            }
+            try {
+                const q = query(
+                    collection(db, 'articulos'),
+                    where('slug', '==', slug),
+                    where('publicado', '==', true),
+                    limit(1)
+                );
+                const snap = await getDocs(q);
+                if (snap.empty) {
+                    showError();
+                    return;
+                }
+                const docSnap = snap.docs[0];
+                const a = docSnap.data();
+                renderArticle(docSnap.id, a);
+                loadRelated(docSnap.id, a.categoria);
+            } catch(e) {
+                console.error('Error cargando artículo:', e);
+                showError();
+            }
+        }
+
+        function renderArticle(id, a) {
+            // Meta tags SEO dinámicos
+            const seoTitle = a.tituloSEO || (a.titulo + ' | Lic. Alder Rodas');
+            const seoDesc  = a.metaDescripcion || stripHtml(a.texto).slice(0, 160);
+            const url      = `https://www.alderrodas.com.ar/blog/${a.slug}`;
+
+            document.getElementById('page-title').textContent    = seoTitle;
+            document.getElementById('page-desc').content         = seoDesc;
+            document.getElementById('page-canonical').href       = url;
+            document.getElementById('og-title').content          = seoTitle;
+            document.getElementById('og-desc').content           = seoDesc;
+            document.getElementById('og-url').content            = url;
+            document.getElementById('tw-title').content          = seoTitle;
+            document.getElementById('tw-desc').content           = seoDesc;
+            if (a.imagenURL) {
+                document.getElementById('og-image').content = a.imagenURL;
+                document.getElementById('tw-image').content = a.imagenURL;
+            }
+
+            // Schema.org BlogPosting
+            const schema = {
+                "@context": "https://schema.org",
+                "@type": "BlogPosting",
+                "headline": a.titulo,
+                "description": seoDesc,
+                "url": url,
+                "datePublished": isoDate(a.fechaPublicacion),
+                "author": { "@type": "Person", "name": "Alder Rodas", "honorificPrefix": "Lic." },
+                "publisher": { "@type": "Person", "name": "Lic. Alder Rodas" },
+                "image": a.imagenURL || ""
+            };
+            document.getElementById('schema-article').textContent = JSON.stringify(schema);
+
+            // Imagen
+            if (a.imagenURL) {
+                const img = document.getElementById('art-img');
+                img.src   = a.imagenURL;
+                img.alt   = a.imagenAlt || a.titulo;
+                img.style.display = 'block';
+            }
+            // Categoría
+            if (a.categoria) {
+                const cat = document.getElementById('art-cat');
+                cat.textContent  = a.categoria;
+                cat.style.display = 'inline-block';
+            }
+            document.getElementById('art-date').textContent = formatDate(a.fechaPublicacion);
+            document.getElementById('art-title').textContent = a.titulo;
+            // Extracto / resumen
+            if (a.extracto) {
+                const ex = document.getElementById('art-excerpt');
+                ex.textContent    = a.extracto;
+                ex.style.display  = 'block';
+            }
+            document.getElementById('art-content').innerHTML = a.texto;
+
+            // Mostrar artículo
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('article-wrap').style.display  = 'block';
+        }
+
+        // ── Artículos relacionados ───────────────────────────
+        async function loadRelated(currentId, categoria) {
+            const section = document.getElementById('related-section');
+            const grid    = document.getElementById('related-grid');
+
+            let snap = null;
+            if (categoria) {
+                const q = query(
+                    collection(db, 'articulos'),
+                    where('publicado', '==', true),
+                    where('categoria', '==', categoria),
+                    orderBy('fechaPublicacion', 'desc'),
+                    limit(4)
+                );
+                snap = await getDocs(q);
+            }
+            if (!snap || snap.empty) {
+                const q = query(
+                    collection(db, 'articulos'),
+                    where('publicado', '==', true),
+                    orderBy('fechaPublicacion', 'desc'),
+                    limit(4)
+                );
+                snap = await getDocs(q);
+            }
+            const docs = snap.docs.filter(d => d.id !== currentId).slice(0, 3);
+            if (docs.length === 0) return;
+
+            docs.forEach(docSnap => {
+                const a = docSnap.data();
+                const imgHtml = a.imagenURL
+                    ? `<img class="blog-card-img" src="${a.imagenURL}" alt="${a.imagenAlt || a.titulo}" loading="lazy">`
+                    : `<div class="blog-card-img-placeholder"><i class="fas fa-pen"></i></div>`;
+                const catHtml = a.categoria ? `<span class="blog-card-cat">${a.categoria}</span>` : '';
+                const card = document.createElement('div');
+                card.className = 'blog-card';
+                card.innerHTML = `
+                    ${imgHtml}
+                    <div class="blog-card-body">
+                        <div class="blog-card-meta">
+                            ${catHtml}
+                            <span class="blog-card-date">${formatDate(a.fechaPublicacion)}</span>
+                        </div>
+                        <h3>${a.titulo}</h3>
+                        <span class="blog-card-link">Leer más <i class="fas fa-arrow-right"></i></span>
+                    </div>`;
+                card.addEventListener('click', () => openModal(docSnap.id, a));
+                grid.appendChild(card);
+            });
+            section.style.display = 'block';
+        }
+
+        // ── Modal (relacionados) ─────────────────────────────
+        function openModal(id, a) {
+            const overlay = document.getElementById('artModal');
+            overlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            const imgWrap = document.getElementById('modalImgWrap');
+            imgWrap.innerHTML = a.imagenURL
+                ? `<img class="art-modal-img" src="${a.imagenURL}" alt="${a.imagenAlt || a.titulo}">`
+                : `<div class="art-modal-img-placeholder"><i class="fas fa-brain"></i></div>`;
+            document.getElementById('modalCat').textContent    = a.categoria || '';
+            document.getElementById('modalDate').textContent   = formatDate(a.fechaPublicacion);
+            document.getElementById('modalTitle').textContent  = a.titulo;
+            document.getElementById('modalContent').innerHTML  = a.texto;
+            document.getElementById('modalFullLink').href      = `/blog/${a.slug}`;
+        }
+        function closeModal() {
+            document.getElementById('artModal').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        document.getElementById('modalClose').addEventListener('click', closeModal);
+        document.getElementById('artModal').addEventListener('click', e => {
+            if (e.target === document.getElementById('artModal')) closeModal();
+        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        function showError() {
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('error-state').style.display   = 'block';
+        }
+
+        // ── Init ─────────────────────────────────────────────
+        loadArticle();
+    </script>
+</body>
+</html>
