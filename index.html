@@ -769,7 +769,7 @@
     <script src="script.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-        import { getFirestore, collection, query, where, orderBy, limit, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+        import { getFirestore, collection, query, orderBy, limit, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCzj5gLvEhZdl3LNoHVqcDMzFKrW_2Dkno",
@@ -834,55 +834,41 @@
             const featuredWrap = document.getElementById('blog-featured');
             const grid = document.getElementById('blog-grid');
             try {
-                // Artículo destacado
-                let featSnap = await getDocs(query(
+                // Una sola consulta sin where → no necesita índice compuesto
+                // Se filtra publicado en el cliente
+                const snap = await getDocs(query(
                     collection(db, 'articulos'),
-                    where('publicado', '==', true),
-                    where('destacado', '==', true),
                     orderBy('fechaPublicacion', 'desc'),
-                    limit(1)
+                    limit(20)
                 ));
-                if (featSnap.empty) {
-                    featSnap = await getDocs(query(
-                        collection(db, 'articulos'),
-                        where('publicado', '==', true),
-                        orderBy('fechaPublicacion', 'desc'),
-                        limit(1)
-                    ));
-                }
-                let featuredId = null;
-                if (!featSnap.empty) {
-                    const fd = featSnap.docs[0];
-                    featuredId = fd.id;
-                    articleCache[fd.id] = fd.data();
-                    const a = fd.data();
-                    const ext = a.extracto || excerpt(a.texto, 200);
-                    featuredWrap.innerHTML = `
-                        <div class="blog-featured-card" style="cursor:pointer;">
-                            ${a.imagenURL ? `<img class="blog-featured-img" src="${a.imagenURL}" alt="${a.imagenAlt || a.titulo}" loading="lazy">` : `<div class="blog-featured-img-placeholder"><i class="fas fa-brain"></i></div>`}
-                            <div class="blog-featured-body">
-                                <div class="blog-featured-meta">
-                                    ${a.categoria ? `<span class="blog-featured-cat">${a.categoria}</span>` : ''}
-                                    <span class="blog-featured-date">${formatDate(a.fechaPublicacion)}</span>
-                                </div>
-                                <h3>${a.titulo}</h3>
-                                <p class="blog-featured-excerpt">${ext}</p>
-                                <button class="blog-read-btn">Leer artículo <i class="fas fa-arrow-right"></i></button>
-                            </div>
-                        </div>`;
-                    featuredWrap.querySelector('.blog-featured-card').addEventListener('click', () => openModal(fd.id));
-                } else {
-                    featuredWrap.innerHTML = '';
-                }
+                const publicados = snap.docs.filter(d => d.data().publicado === true);
+                if (publicados.length === 0) return;
 
-                // Grid (3 artículos recientes, excluir destacado)
-                const recSnap = await getDocs(query(
-                    collection(db, 'articulos'),
-                    where('publicado', '==', true),
-                    orderBy('fechaPublicacion', 'desc'),
-                    limit(4)
-                ));
-                const recent = recSnap.docs.filter(d => d.id !== featuredId).slice(0, 3);
+                // Artículo destacado: primero con destacado=true, sino el más reciente
+                const destIdx = publicados.findIndex(d => d.data().destacado === true);
+                const featDoc  = destIdx >= 0 ? publicados[destIdx] : publicados[0];
+                const featuredId = featDoc.id;
+                const a = featDoc.data();
+                articleCache[featDoc.id] = a;
+                const ext = a.extracto || excerpt(a.texto, 200);
+
+                featuredWrap.innerHTML = `
+                    <div class="blog-featured-card" style="cursor:pointer;">
+                        ${a.imagenURL ? `<img class="blog-featured-img" src="${a.imagenURL}" alt="${a.imagenAlt || a.titulo}" loading="lazy">` : `<div class="blog-featured-img-placeholder"><i class="fas fa-brain"></i></div>`}
+                        <div class="blog-featured-body">
+                            <div class="blog-featured-meta">
+                                ${a.categoria ? `<span class="blog-featured-cat">${a.categoria}</span>` : ''}
+                                <span class="blog-featured-date">${formatDate(a.fechaPublicacion)}</span>
+                            </div>
+                            <h3>${a.titulo}</h3>
+                            <p class="blog-featured-excerpt">${ext}</p>
+                            <button class="blog-read-btn">Leer artículo <i class="fas fa-arrow-right"></i></button>
+                        </div>
+                    </div>`;
+                featuredWrap.querySelector('.blog-featured-card').addEventListener('click', () => openModal(featDoc.id));
+
+                // Grid: hasta 3 artículos recientes excluyendo el destacado
+                const recent = publicados.filter(d => d.id !== featuredId).slice(0, 3);
                 recent.forEach(docSnap => {
                     const a = docSnap.data();
                     articleCache[docSnap.id] = a;

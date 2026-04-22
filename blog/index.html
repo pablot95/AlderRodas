@@ -99,7 +99,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-        import { getFirestore, collection, query, where, orderBy, limit, startAfter, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+        import { getFirestore, collection, query, orderBy, limit, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCzj5gLvEhZdl3LNoHVqcDMzFKrW_2Dkno",
@@ -113,8 +113,9 @@
         const db  = getFirestore(app);
 
         const PAGE_SIZE = 6;
-        let lastDoc = null;
-        let featuredId = null;
+        let allPublished = [];   // todos los artículos publicados, ordenados
+        let featuredId   = null;
+        let pageOffset   = 0;   // cuántos del grid ya se mostraron
 
         // ── Helpers ────────────────────────────────────────
         function formatDate(ts) {
@@ -132,36 +133,37 @@
             return plain.length > len ? plain.slice(0, len).trimEnd() + '…' : plain;
         }
 
+        // ── Cargar todos los artículos publicados ──────────
+        // Una sola query sin where sobre otro campo → no necesita índice compuesto.
+        // Se filtra publicado === true en el cliente.
+        async function loadAll() {
+            const snap = await getDocs(query(
+                collection(db, 'articulos'),
+                orderBy('fechaPublicacion', 'desc'),
+                limit(200)
+            ));
+            allPublished = snap.docs.filter(d => d.data().publicado === true);
+        }
+
         // ── Featured article ────────────────────────────────
         async function loadFeatured() {
             const wrap = document.getElementById('featured-wrap');
             try {
-                const q = query(
-                    collection(db, 'articulos'),
-                    where('publicado', '==', true),
-                    where('destacado', '==', true),
-                    orderBy('fechaPublicacion', 'desc'),
-                    limit(1)
-                );
-                let snap = await getDocs(q);
-                // Fallback: primer artículo publicado si no hay destacado
-                if (snap.empty) {
-                    const q2 = query(
-                        collection(db, 'articulos'),
-                        where('publicado', '==', true),
-                        orderBy('fechaPublicacion', 'desc'),
-                        limit(1)
-                    );
-                    snap = await getDocs(q2);
-                }
-                if (snap.empty) {
+                await loadAll();
+
+                if (allPublished.length === 0) {
                     document.getElementById('featured-spinner').remove();
                     document.getElementById('empty-msg').style.display = 'block';
                     return;
                 }
-                const docSnap = snap.docs[0];
-                featuredId = docSnap.id;
-                const a = docSnap.data();
+
+                // Primero el que tenga destacado=true, sino el más reciente
+                const destIdx = allPublished.findIndex(d => d.data().destacado === true);
+                const featDoc = destIdx >= 0 ? allPublished[destIdx] : allPublished[0];
+                featuredId = featDoc.id;
+                const a = featDoc.data();
+                articleCache[featDoc.id] = a;
+
                 const ext = a.extracto || excerpt(a.texto, 200);
                 const imgHtml = a.imagenURL
                     ? `<img class="blog-featured-img" src="${a.imagenURL}" alt="${a.imagenAlt || a.titulo}" loading="lazy">`
@@ -169,7 +171,7 @@
                 const catHtml = a.categoria ? `<span class="blog-featured-cat">${a.categoria}</span>` : '';
 
                 wrap.innerHTML = `
-                <div class="blog-featured-card" data-id="${docSnap.id}">
+                <div class="blog-featured-card" data-id="${featDoc.id}">
                     ${imgHtml}
                     <div class="blog-featured-body">
                         <div class="blog-featured-meta">
@@ -178,80 +180,69 @@
                         </div>
                         <h2>${a.titulo}</h2>
                         <p class="blog-featured-excerpt">${ext}</p>
-                        <button class="blog-read-btn" onclick="openModal('${docSnap.id}')">
+                        <button class="blog-read-btn" onclick="openModal('${featDoc.id}')">
                             Leer artículo <i class="fas fa-arrow-right"></i>
                         </button>
                     </div>
                 </div>`;
-                wrap.querySelector('.blog-featured-card').addEventListener('click', () => openModal(docSnap.id));
+                wrap.querySelector('.blog-featured-card').addEventListener('click', () => openModal(featDoc.id));
 
             } catch(e) {
                 console.error('Error cargando artículo destacado:', e);
                 wrap.innerHTML = '';
             }
-            await loadArticles(true);
+            renderPage();
         }
 
-        // ── Articles grid ────────────────────────────────────
-        async function loadArticles(first = false) {
-            const grid = document.getElementById('articles-grid');
+        // ── Paginación en el cliente ─────────────────────────
+        function renderPage() {
+            const grid    = document.getElementById('articles-grid');
             const section = document.getElementById('articles-section');
-            const btn = document.getElementById('load-more-btn');
+            const btn     = document.getElementById('load-more-btn');
 
-            const constraints = [
-                collection(db, 'articulos'),
-                where('publicado', '==', true),
-                orderBy('fechaPublicacion', 'desc'),
-                limit(PAGE_SIZE + 1) // +1 para saber si hay más
-            ];
-            if (!first && lastDoc) constraints.push(startAfter(lastDoc));
+            // Artículos sin el destacado
+            const rest = allPublished.filter(d => d.id !== featuredId);
 
-            try {
-                const q = query(...constraints);
-                const snap = await getDocs(q);
-                const docs = snap.docs.filter(d => d.id !== featuredId);
-                const hasMore = docs.length > PAGE_SIZE;
-                const toShow = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
-                lastDoc = toShow[toShow.length - 1] || lastDoc;
-
-                if (first && toShow.length === 0) {
-                    section.style.display = 'none';
-                    document.getElementById('empty-msg').style.display = 'block';
-                    return;
-                }
-                section.style.display = 'block';
-
-                toShow.forEach(docSnap => {
-                    const a = docSnap.data();
-                    const ext = a.extracto || excerpt(a.texto, 120);
-                    const imgHtml = a.imagenURL
-                        ? `<img class="blog-card-img" src="${a.imagenURL}" alt="${a.imagenAlt || a.titulo}" loading="lazy">`
-                        : `<div class="blog-card-img-placeholder"><i class="fas fa-pen"></i></div>`;
-                    const catHtml = a.categoria ? `<span class="blog-card-cat">${a.categoria}</span>` : '';
-
-                    const card = document.createElement('div');
-                    card.className = 'blog-card';
-                    card.innerHTML = `
-                        ${imgHtml}
-                        <div class="blog-card-body">
-                            <div class="blog-card-meta">
-                                ${catHtml}
-                                <span class="blog-card-date">${formatDate(a.fechaPublicacion)}</span>
-                            </div>
-                            <h3>${a.titulo}</h3>
-                            <p class="blog-card-excerpt">${ext}</p>
-                            <span class="blog-card-link">Leer más <i class="fas fa-arrow-right"></i></span>
-                        </div>`;
-                    card.addEventListener('click', () => openModal(docSnap.id));
-                    grid.appendChild(card);
-                });
-
-                btn.style.display = hasMore ? 'inline-flex' : 'none';
-                if (!first) btn.dataset.loading = 'false';
-
-            } catch(e) {
-                console.error('Error cargando artículos:', e);
+            if (rest.length === 0) {
+                section.style.display = 'none';
+                if (allPublished.length === 0) document.getElementById('empty-msg').style.display = 'block';
+                return;
             }
+            section.style.display = 'block';
+
+            const toShow = rest.slice(pageOffset, pageOffset + PAGE_SIZE);
+            pageOffset += toShow.length;
+
+            toShow.forEach(docSnap => {
+                const a = docSnap.data();
+                articleCache[docSnap.id] = a;
+                const ext = a.extracto || excerpt(a.texto, 120);
+                const imgHtml = a.imagenURL
+                    ? `<img class="blog-card-img" src="${a.imagenURL}" alt="${a.imagenAlt || a.titulo}" loading="lazy">`
+                    : `<div class="blog-card-img-placeholder"><i class="fas fa-pen"></i></div>`;
+                const catHtml = a.categoria ? `<span class="blog-card-cat">${a.categoria}</span>` : '';
+
+                const card = document.createElement('div');
+                card.className = 'blog-card';
+                card.innerHTML = `
+                    ${imgHtml}
+                    <div class="blog-card-body">
+                        <div class="blog-card-meta">
+                            ${catHtml}
+                            <span class="blog-card-date">${formatDate(a.fechaPublicacion)}</span>
+                        </div>
+                        <h3>${a.titulo}</h3>
+                        <p class="blog-card-excerpt">${ext}</p>
+                        <span class="blog-card-link">Leer más <i class="fas fa-arrow-right"></i></span>
+                    </div>`;
+                card.addEventListener('click', () => openModal(docSnap.id));
+                grid.appendChild(card);
+            });
+
+            const hasMore = pageOffset < rest.length;
+            btn.style.display = hasMore ? 'inline-flex' : 'none';
+            btn.dataset.loading = 'false';
+            btn.innerHTML = '<i class="fas fa-plus"></i> Cargar más artículos';
         }
 
         // ── Modal ────────────────────────────────────────────
@@ -262,9 +253,7 @@
             overlay.classList.add('open');
             document.body.style.overflow = 'hidden';
 
-            // Usar cache si ya está cargado
             if (!articleCache[id]) {
-                const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js");
                 const snap = await getDoc(doc(db, 'articulos', id));
                 if (snap.exists()) articleCache[id] = snap.data();
             }
@@ -305,9 +294,7 @@
             if (this.dataset.loading === 'true') return;
             this.dataset.loading = 'true';
             this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
-            loadArticles(false).then(() => {
-                this.innerHTML = '<i class="fas fa-plus"></i> Cargar más artículos';
-            });
+            renderPage();
         });
 
         // ── Init ─────────────────────────────────────────────
