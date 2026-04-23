@@ -1051,6 +1051,7 @@
             .footer-top { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 768px) {
+            .ticker-track { animation-duration: 10s; }
             nav { padding: 18px 20px; width: 100%; box-sizing: border-box; }
             nav.scrolled { padding: 14px 20px; }
             .nav-links { display: none; }
